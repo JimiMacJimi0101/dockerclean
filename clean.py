@@ -15,8 +15,15 @@ def stop_and_remove_containers(docker_host, container_names_to_keep):
 
     # Stop and remove containers
     if container_ids_to_remove:
-        subprocess.check_call(['docker', '-H', docker_host, 'stop'] + container_ids_to_remove)
-        subprocess.check_call(['docker', '-H', docker_host, 'rm'] + container_ids_to_remove)
+        for container_id in container_ids_to_remove:
+            # Stop the container
+            subprocess.check_call(['docker', '-H', docker_host, 'stop', container_id])
+            # Get the name of the container
+            container_name = subprocess.check_output(['docker', '-H', docker_host, 'inspect', '-f', '{{.Name}}', container_id], encoding='ascii').strip()
+            # Remove the container
+            subprocess.check_call(['docker', '-H', docker_host, 'rm', container_id])
+            # Print the name of the removed container
+            print(f'Removed container: {container_name}')
 
 if __name__ == '__main__':
     # Parse command line arguments
