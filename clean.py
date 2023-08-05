@@ -1,31 +1,27 @@
-import sys
 import subprocess
-import time
+import sys
 
-def cleanup_remote_containers(remote_host, containers_to_keep):
-    while True:
-        # Get a list of all container names on the remote host
-        all_containers = subprocess.check_output(["docker", "-H", remote_host, "ps", "-aq"], universal_newlines=True).splitlines()
+def stop_and_remove_containers(docker_host, container_names_to_keep):
+    # Get the list of all container IDs
+    container_ids = subprocess.check_output(['docker', '-H', docker_host, 'ps', '-aq'], encoding='ascii')
+    container_ids = container_ids.strip().split()
 
-        # Loop through all containers and stop/delete those that aren't in the keep list
-        for container in all_containers:
-            container_name = subprocess.check_output(["docker", "-H", remote_host, "inspect", "-f", "{{.Name}}", container], universal_newlines=True).strip("/")
-            if container_name not in containers_to_keep:
-                print(f"Stopping and deleting container on {remote_host}: {container_name}")
-                subprocess.run(["docker", "-H", remote_host, "stop", container])
-                subprocess.run(["docker", "-H", remote_host, "rm", container])
-            else:
-                print(f"Skipping container on {remote_host}: {container_name} (protected)")
+    # Filter out container IDs based on their names
+    container_ids_to_remove = []
+    for container_id in container_ids:
+        container_name = subprocess.check_output(['docker', '-H', docker_host, 'inspect', '-f', '{{.Name}}', container_id], encoding='ascii').strip()
+        if container_name not in container_names_to_keep:
+            container_ids_to_remove.append(container_id)
 
-        print("Cleanup complete.")
-        time.sleep(3600)  # Delay for 1 hour before the next cleanup
+    # Stop and remove containers
+    if container_ids_to_remove:
+        subprocess.check_call(['docker', '-H', docker_host, 'stop'] + container_ids_to_remove)
+        subprocess.check_call(['docker', '-H', docker_host, 'rm'] + container_ids_to_remove)
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python script.py <remote_host>")
-        sys.exit(1)
+if __name__ == '__main__':
+    # Parse command line arguments
+    docker_host = sys.argv[1]
+    container_names_to_keep = sys.argv[2:]
 
-    remote_host = sys.argv[1]
-    containers_to_keep = ["redis", "nexus", "mysql", "mongo", "mts"]
-    
-    cleanup_remote_containers(remote_host, containers_to_keep)
+    # Stop and remove containers
+    stop_and_remove_containers(docker_host, container_names_to_keep)
